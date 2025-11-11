@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Proyectos Académicos</title>
+    <link rel="stylesheet" href="./static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-graduation-cap"></i> Sistema de Gestión de Proyectos Académicos</h1>
+            <p>Conectado a Google Sheets - Base de datos en la nube</p>
+            <div id="connection-status" class="connection-status">
+                <i class="fas fa-sync-alt fa-spin"></i> Verificando conexión...
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Sección de búsqueda -->
+            <section class="search-section">
+                <h2><i class="fas fa-search"></i> Búsqueda Avanzada</h2>
+                <div class="search-form">
+                    <input type="text" id="search-input" placeholder="Buscar por estudiante, asesor, proyecto, programa, evaluadores...">
+                    <button id="search-btn">
+                        <i class="fas fa-search"></i> Buscar
+                    </button>
+                </div>
+                <div class="search-actions">
+                    <button id="show-all-btn" class="btn-secondary">
+                        <i class="fas fa-list"></i> Mostrar Todos
+                    </button>
+                    <button id="export-pdf-btn" class="btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
+                    <button id="export-excel-btn" class="btn-secondary">
+                        <i class="fas fa-file-excel"></i> Exportar Excel
+                    </button>
+                    <button id="refresh-btn" class="btn-secondary">
+                        <i class="fas fa-sync-alt"></i> Actualizar
+                    </button>
+                </div>
+                <div id="search-results" class="results-container">
+                    <div class="no-results">Usa el buscador para encontrar proyectos.</div>
+                </div>
+            </section>
+
+            <!-- Sección de agregar registro -->
+            <section class="add-section">
+                <h2><i class="fas fa-plus-circle"></i> Agregar Nuevo Proyecto</h2>
+                <form id="add-form" class="project-form">
+                    <input type="hidden" id="modo_edicion" name="modo_edicion" value="agregar">
+                    <input type="hidden" id="numero_fila" name="numero_fila" value="">
+                    
+                    <div class="form-group">
+                        <label for="proyecto">Proyecto/Artículo *</label>
+                        <input type="text" id="proyecto" name="proyecto_articulo" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="programa">Programa *</label>
+                        <input type="text" id="programa" name="programa" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="estudiante1">Estudiante 1 *</label>
+                            <input type="text" id="estudiante1" name="estudiante1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="estudiante2">Estudiante 2</label>
+                            <input type="text" id="estudiante2" name="estudiante2">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="asesor">Asesor *</label>
+                        <input type="text" id="asesor" name="asesor" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="evaluador1">Evaluador 1</label>
+                            <input type="text" id="evaluador1" name="evaluador1">
+                        </div>
+                        <div class="form-group">
+                            <label for="evaluador2">Evaluador 2</label>
+                            <input type="text" id="evaluador2" name="evaluador2">
+                        </div>
+                        <div class="form-group">
+                            <label for="evaluador3">Evaluador 3</label>
+                            <input type="text" id="evaluador3" name="evaluador3">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="hora">Hora</label>
+                            <input type="time" id="hora" name="hora">
+                        </div>
+                        <div class="form-group">
+                            <label for="fecha">Fecha sustentación</label>
+                            <input type="date" id="fecha" name="fecha_sustentacion">
+                        </div>
+                    </div>
+
+                    <!-- NUEVOS CAMPOS PARA LAS 16 COLUMNAS -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="convocatoria">Convocatoria</label>
+                            <input type="text" id="convocatoria" name="convocatoria">
+                        </div>
+                        <div class="form-group">
+                            <label for="articulo_monografia">ARTICULO/MONOGRAFIA</label>
+                            <input type="text" id="articulo_monografia" name="articulo_monografia">
+                        </div>
+                        <div class="form-group">
+                            <label for="ano">Año</label>
+                            <input type="text" id="ano" name="ano" placeholder="Ej: 2024">
+                        </div>
+                    </div>
+
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label for="propuesta">Estado Propuesta</label>
+                            <select id="propuesta" name="propuesta">
+                                <option value="">Seleccionar</option>
+                                  <option value="Propuesta">Propuesta</option>
+                                <option value="Aprobado">Aprobado</option>
+                                <option value="En revisión">En revisión</option>
+                                <option value="No aprobado">No aprobado</option>
+                                <option value="No aplica">No aplica</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="anteproyecto">Estado Anteproyecto</label>
+                            <select id="anteproyecto" name="anteproyecto">
+                                <option value="">Seleccionar</option>
+                                  <option value="Anteproyecto">Anteproyecto</option>
+                                <option value="Aprobado">Aprobado</option>
+                                <option value="En revisión">En revisión</option>
+                                <option value="No aprobado">No aprobado</option>
+                                <option value="No aplica">No aplica</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="trabajo-final">Estado Trabajo Final</label>
+                            <select id="trabajo-final" name="trabajo_final">
+                                <option value="">Seleccionar</option>
+                                  <option value="Trabajo_final">Trabajo_final</option>
+                                <option value="Aprobado">Aprobado</option>
+                                <option value="En revisión">En revisión</option>
+                                <option value="No aprobado">No aprobado</option>
+                                <option value="No aplica">No aplica</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="display: flex; gap: 15px; margin-top: 20px;">
+                        <button type="submit" id="submit-btn" class="btn-primary">
+                            <i class="fas fa-save"></i> <span id="submit-text">Guardar en Google Sheets</span>
+                        </button>
+                        <button type="button" id="cancel-edit-btn" class="btn-secondary" style="display: none;">
+                            <i class="fas fa-times"></i> Cancelar Edición
+                        </button>
+                    </div>
+                    <div id="form-message"></div>
+                </form>
+            </section>
+        </div>
+
+        <!-- Estadísticas -->
+<section class="stats-dashboard">
+    <h2><i class="fas fa-chart-bar"></i> Dashboard de Estadísticas</h2>
+    
+    <!-- Tarjetas de resumen -->
+    <div class="stats-summary">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-project-diagram"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-proyectos">0</h3>
+                <p>Total Proyectos</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="propuestas">0</h3>
+                <p>Propuestas </p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-graduation-cap"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="trabajos-finales">0</h3>
+                <p>Trabajos Finales </p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-anteproyectos">0</h3>
+                <p>Total Anteproyectos</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cuadros de gráficas interactivas -->
+    <div class="charts-grid">
+        <!-- Distribución por Programa -->
+        <div class="chart-box" data-chart="programas">
+            <div class="chart-header">
+                <h4><i class="fas fa-pie-chart"></i> Distribución por Programa</h4>
+                <i class="fas fa-chevron-down chart-toggle"></i>
+            </div>
+            <div class="chart-content" id="chart-programas">
+                <div class="chart-placeholder">
+                    <i class="fas fa-chart-pie"></i>
+                    <p>Haz clic para ver la distribución</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Asesores -->
+        <div class="chart-box" data-chart="asesores">
+            <div class="chart-header">
+                <h4><i class="fas fa-user-tie"></i> Top Asesores</h4>
+                <i class="fas fa-chevron-down chart-toggle"></i>
+            </div>
+            <div class="chart-content" id="chart-asesores">
+                <div class="chart-placeholder">
+                    <i class="fas fa-chart-bar"></i>
+                    <p>Haz clic para ver los asesores</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estados de Propuestas -->
+        <div class="chart-box" data-chart="propuestas">
+            <div class="chart-header">
+                <h4><i class="fas fa-tasks"></i> Estados de Propuestas</h4>
+                <i class="fas fa-chevron-down chart-toggle"></i>
+            </div>
+            <div class="chart-content" id="chart-propuestas">
+                <div class="chart-placeholder">
+                    <i class="fas fa-chart-line"></i>
+                    <p>Haz clic para ver los estados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proyectos por Fecha -->
+        <div class="chart-box" data-chart="fechas">
+            <div class="chart-header">
+                <h4><i class="fas fa-calendar-alt"></i> Proyectos por Fecha</h4>
+                <i class="fas fa-chevron-down chart-toggle"></i>
+            </div>
+            <div class="chart-content" id="chart-fechas">
+                <div class="chart-placeholder">
+                    <i class="fas fa-chart-bar"></i>
+                    <p>Haz clic para ver por fecha</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de actualización -->
+    <div class="stats-footer">
+        <p id="stats-update-time">
+            <i class="fas fa-sync-alt"></i> 
+            Última actualización: <span id="last-update">Cargando...</span>
+        </p>
+        <button id="refresh-stats-btn" class="btn-secondary">
+            <i class="fas fa-redo"></i> Actualizar Estadísticas
+        </button>
+    </div>
+</section>
+
+    <!-- Modal para detalles -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Detalles del Proyecto</h2>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+    <script src="./static/script.js"></script>
+</body>
+</html>

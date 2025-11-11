@@ -1,0 +1,39 @@
+{
+  "proyectos": [
+    {
+      "id": 1,
+      "proyecto_articulo": "Sistema de Gestión Académica Inteligente",
+      "programa": "Ingeniería de Sistemas",
+      "estudiante1": "Juan Pérez",
+      "estudiante2": "María García",
+      "asesor": "Dr. Carlos López",
+      "evaluador1": "Dr. Ana Martínez",
+      "evaluador2": "Mg. Pedro Sánchez",
+      "evaluador3": "Lic. Laura Rodríguez",
+      "hora": "14:30",
+      "propuesta": "Aprobado",
+      "anteproyecto": "En revisión",
+      "trabajo_final": "No iniciado",
+      "fecha_sustentacion": "2024-12-15",
+      "fecha_creacion": "2024-01-15T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "proyecto_articulo": "Análisis de Big Data en Educación",
+      "programa": "Maestría en Informática",
+      "estudiante1": "Carlos Ramírez",
+      "estudiante2": "",
+      "asesor": "Dra. Elena Morales",
+      "evaluador1": "Dr. Roberto Silva",
+      "evaluador2": "Mg. Patricia Castro",
+      "evaluador3": "",
+      "hora": "10:00",
+      "propuesta": "Aprobado",
+      "anteproyecto": "Aprobado",
+      "trabajo_final": "En revisión",
+      "fecha_sustentacion": "2024-11-20",
+      "fecha_creacion": "2024-01-10T14:30:00.000Z"
+    }
+  ],
+  "ultimaActualizacion": "2024-01-20T08:00:00.000Z"
+}

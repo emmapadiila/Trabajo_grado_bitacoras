@@ -1,0 +1,7 @@
+flask
+gspread
+google-auth
+pandas
+reportlab
+openpyxl
+pyinstaller

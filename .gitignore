@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.spec
+*.exe
+*.db
+*.log
+*.xlsx
+*.pdf
+.env
+credentials.json
