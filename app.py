@@ -733,130 +733,114 @@ def obtener_estadisticas_detalladas():
         registros = get_registros(force=False)
         total = len(registros)
 
-        # CONTADORES
+        # Conteos simples: basta con que la celda no esté vacía
+        total_propuestas = 0
+        total_anteproyectos = 0
+        total_trabajos_finales = 0
         propuestas_aprobadas = 0
-        anteproyectos_totales = 0
         trabajos_finales_aprobados = 0
-        
-        logger.info("=== ESTADÍSTICAS CON NOMBRES CORRECTOS ===")
-        
+
+        def _contar_estado(campo: str) -> Dict[str, int]:
+            """Clasifica estados por campo usando palabras clave básicas."""
+            aprobados = revision = no_aprobados = no_especificado = 0
+            for r in registros:
+                valor = str(r.get(campo, "") or "").strip()
+                if not valor:
+                    no_especificado += 1
+                    continue
+                v = valor.lower()
+                if any(term in v for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                    aprobados += 1
+                elif any(term in v for term in ["revisión", "revision", "revisando", "pendiente", "en proceso"]):
+                    revision += 1
+                elif any(term in v for term in ["no aprobado", "rechazado", "rejected", "no"]):
+                    no_aprobados += 1
+                else:
+                    aprobados += 1  # valor presente pero sin palabra clave, se considera aprobado
+            return {
+                "aprobados": aprobados,
+                "revision": revision,
+                "no_aprobados": no_aprobados,
+                "no_especificado": no_especificado,
+            }
+
         for r in registros:
-            # USAR LOS NOMBRES EXACTOS CON ESPACIOS AL FINAL
-            propuesta_val = r.get('Propuesta', '') or r.get('Propuesta ', '')
-            anteproyecto_val = r.get('Anteproyecto ', '')  # CON ESPACIO AL FINAL
-            trabajo_final_val = r.get('Trabajo final ', '')  # CON ESPACIO AL FINAL
-            
-            # Contar Propuestas Aprobadas - cualquier valor no vacío
-            if propuesta_val and str(propuesta_val).strip() and propuesta_val.strip().lower() != 'propuesta':
-                propuestas_aprobadas += 1
-            
-            # Contar Total Anteproyectos - CUALQUIER valor no vacío cuenta
-            if anteproyecto_val and str(anteproyecto_val).strip() and anteproyecto_val.strip().lower() != 'anteproyecto':
-                anteproyectos_totales += 1
-            
-            # Contar Trabajos Finales Aprobados - CUALQUIER valor no vacío cuenta como aprobado
-            if trabajo_final_val and str(trabajo_final_val).strip() and trabajo_final_val.strip().lower() != 'trabajo final':
-                trabajos_finales_aprobados += 1
+            propuesta_val = str(r.get("Propuesta", "") or "").strip()
+            anteproyecto_val = str(r.get("Anteproyecto", "") or "").strip()
+            trabajo_final_val = str(r.get("Trabajo final", "") or "").strip()
 
-        logger.info("=== RESULTADOS FINALES ===")
-        logger.info(f"Propuestas aprobadas: {propuestas_aprobadas}")
-        logger.info(f"Anteproyectos totales: {anteproyectos_totales}")
-        logger.info(f"Trabajos finales aprobados: {trabajos_finales_aprobados}")
+            if propuesta_val:
+                total_propuestas += 1
+                if any(term in propuesta_val.lower() for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                    propuestas_aprobadas += 1
 
-        # Estadísticas por programa
+            if anteproyecto_val:
+                total_anteproyectos += 1
+
+            if trabajo_final_val:
+                total_trabajos_finales += 1
+                if any(term in trabajo_final_val.lower() for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                    trabajos_finales_aprobados += 1
+
         programas = {}
         for r in registros:
-            programa = (r.get("Programa") or "No especificado").strip()
-            if not programa:
-                programa = "No especificado"
+            programa = (r.get("Programa") or "No especificado").strip() or "No especificado"
             programas[programa] = programas.get(programa, 0) + 1
 
-        # Estadísticas por asesor (top 10)
         asesores = {}
         for r in registros:
             asesor = (r.get("Asesor") or "").strip()
             if asesor and asesor.lower() not in ["no especificado", "sin especificar", "none", ""]:
                 asesores[asesor] = asesores.get(asesor, 0) + 1
-        
         top_asesores = dict(sorted(asesores.items(), key=lambda x: x[1], reverse=True)[:10])
 
-        # Función auxiliar para contar estados
-        def _contar_estado(campo):
-            aprobados = 0
-            revision = 0
-            no_aprobados = 0
-            no_especificado = 0
-            
-            for r in registros:
-                estado = str(r.get(campo, '') or r.get(campo + ' ', '')).strip()
-                if not estado:
-                    no_especificado += 1
-                elif any(aprobado in estado.lower() for aprobado in ['aprobado', 'aprobada', 'approved', 'si', 'sí', 'yes']):
-                    aprobados += 1
-                elif any(revision_term in estado.lower() for revision_term in ['revisión', 'revision', 'revisando', 'pendiente', 'en proceso']):
-                    revision += 1
-                elif any(rechazado in estado.lower() for rechazado in ['no aprobado', 'rechazado', 'rejected', 'no']):
-                    no_aprobados += 1
-                else:
-                    aprobados += 1
-            
-            return {
-                'aprobados': aprobados,
-                'revision': revision,
-                'no_aprobados': no_aprobados,
-                'no_especificado': no_especificado
-            }
+        propuestas_stats = _contar_estado("Propuesta")
+        anteproyecto_stats = _contar_estado("Anteproyecto")
+        trabajo_final_stats = _contar_estado("Trabajo final")
 
-        propuestas_stats = _contar_estado('Propuesta')
-        anteproyecto_stats = _contar_estado('Anteproyecto')
-        trabajo_final_stats = _contar_estado('Trabajo final')
-
-        # Estadísticas por fecha
         fechas_sustentacion = {}
         for r in registros:
-            fecha = r.get('Fecha sustentación', '').strip()
+            fecha = r.get("Fecha sustentaci�n", "").strip()
             if fecha and fecha.lower() not in ["no especificado", "none", ""]:
                 fechas_sustentacion[fecha] = fechas_sustentacion.get(fecha, 0) + 1
-
         fechas_ordenadas = dict(sorted(fechas_sustentacion.items(), key=lambda x: x[0])[-15:])
 
-        # Estadísticas por año
         anos = {}
         for r in registros:
-            ano = str(r.get('Año', '')).strip()
+            ano = str(r.get("A�o", "")).strip()
             if ano and ano.isdigit():
                 anos[ano] = anos.get(ano, 0) + 1
 
         data = {
             "totales": {
                 "total_proyectos": total,
-                "total_propuestas": sum(propuestas_stats.values()),
-                "total_anteproyectos": anteproyectos_totales,
-                "total_trabajos_finales": sum(trabajo_final_stats.values())
+                "total_propuestas": total_propuestas,
+                "total_anteproyectos": total_anteproyectos,
+                "total_trabajos_finales": total_trabajos_finales,
             },
             "estados_contadores": {
                 "propuestas_aprobadas": propuestas_aprobadas,
-                "trabajos_finales_aprobados": trabajos_finales_aprobados
+                "trabajos_finales_aprobados": trabajos_finales_aprobados,
             },
             "por_programa": programas,
             "por_asesor": top_asesores,
             "estados": {
                 "propuestas": propuestas_stats,
                 "anteproyectos": anteproyecto_stats,
-                "trabajos_finales": trabajo_final_stats
+                "trabajos_finales": trabajo_final_stats,
             },
             "por_fecha": fechas_ordenadas,
             "por_ano": anos,
-            "ultima_actualizacion": datetime.now().isoformat()
+            "ultima_actualizacion": datetime.now().isoformat(),
         }
-        
+
         resp = jsonify(data)
         resp.headers["Cache-Control"] = "no-cache"
         return resp
-        
+
     except Exception as e:
         logger.exception("Error calculando estadisticas detalladas")
-        return jsonify({"error": f"Error al obtener estadísticas: {e}"}), 500
+        return jsonify({"error": f"Error al obtener estad�sticas: {e}"}), 500
 
 # ----------------------------------------------------------------------------
 # control 
