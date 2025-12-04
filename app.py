@@ -726,37 +726,67 @@ def exportar_excel():
 # ----------------------------------------------------------------------------
 # Estadísticas Mejoradas
 # ----------------------------------------------------------------------------
-
 @app.route("/estadisticas-detalladas", methods=["GET"])
 def obtener_estadisticas_detalladas():
     try:
         registros = get_registros(force=False)
         total = len(registros)
 
-        # Conteos simples: basta con que la celda no esté vacía
-        total_propuestas = 0
-        total_anteproyectos = 0
-        total_trabajos_finales = 0
-        propuestas_aprobadas = 0
-        trabajos_finales_aprobados = 0
+        def _normalize_header(texto: Any) -> str:
+            """Normaliza nombres de columna: quita NBSP/BOM, tildes, _-/ , barras y espacios repetidos."""
+            if texto is None:
+                return ""
+            s = str(texto).replace("\ufeff", "").replace("\xa0", " ")
+            s = s.replace("_", " ").replace("-", " ").replace("/", " ")
+            s = " ".join(s.strip().split()).lower()
+            s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("ASCII")
+            return s
 
-        def _contar_estado(campo: str) -> Dict[str, int]:
-            """Clasifica estados por campo usando palabras clave básicas."""
+        def _get_valor(r: Dict[str, Any], candidatos) -> str:
+            """
+            Devuelve el valor de la primera columna coincidente.
+            Prioriza match exacto de clave tal cual viene en la fila, luego match normalizado.
+            """
+            # 1) Intento directo (sin normalizar) para capturar claves con espacios finales
+            for c in candidatos:
+                if c in r:
+                    return r.get(c) or ""
+            # 2) Intento normalizado
+            objetivos = {_normalize_header(c) for c in candidatos}
+            for k, v in r.items():
+                if _normalize_header(k) in objetivos:
+                    return v or ""
+            return ""
+
+        def _valor_limpio(val: Any) -> str:
+            v = str(val or "").replace("\xa0", " ").strip()
+            if not v:
+                return ""
+            return unicodedata.normalize("NFKD", v).encode("ASCII", "ignore").decode("ASCII").lower()
+
+        def _contar_estado(candidatos) -> Dict[str, int]:
             aprobados = revision = no_aprobados = no_especificado = 0
             for r in registros:
-                valor = str(r.get(campo, "") or "").strip()
+                # Intento directo por cada candidato antes de normalizar
+                raw = ""
+                for c in candidatos:
+                    if c in r and (r.get(c) or "").strip():
+                        raw = r.get(c) or ""
+                        break
+                if not raw:
+                    raw = _get_valor(r, candidatos)
+                valor = _valor_limpio(raw)
                 if not valor:
                     no_especificado += 1
                     continue
-                v = valor.lower()
-                if any(term in v for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                if any(term in valor for term in ["aprobado", "aprobada", "approved", "si", "si ", "yes"]):
                     aprobados += 1
-                elif any(term in v for term in ["revisión", "revision", "revisando", "pendiente", "en proceso"]):
+                elif any(term in valor for term in ["revision", "revisando", "pendiente", "en proceso"]):
                     revision += 1
-                elif any(term in v for term in ["no aprobado", "rechazado", "rejected", "no"]):
+                elif any(term in valor for term in ["no aprobado", "rechazado", "rejected", "no"]):
                     no_aprobados += 1
                 else:
-                    aprobados += 1  # valor presente pero sin palabra clave, se considera aprobado
+                    aprobados += 1
             return {
                 "aprobados": aprobados,
                 "revision": revision,
@@ -764,14 +794,31 @@ def obtener_estadisticas_detalladas():
                 "no_especificado": no_especificado,
             }
 
+        total_propuestas = total_anteproyectos = total_trabajos_finales = 0
+        propuestas_aprobadas = trabajos_finales_aprobados = 0
+
         for r in registros:
-            propuesta_val = str(r.get("Propuesta", "") or "").strip()
-            anteproyecto_val = str(r.get("Anteproyecto", "") or "").strip()
-            trabajo_final_val = str(r.get("Trabajo final", "") or "").strip()
+            # Leer celdas priorizando los nombres exactos observados en la hoja (con espacios finales)
+            propuesta_val = _valor_limpio(
+                r.get("Propuesta", "")
+                or r.get("Propuesta ", "")
+                or _get_valor(r, ["Propuesta", "propuesta"])
+            )
+            anteproyecto_val = _valor_limpio(
+                r.get("Anteproyecto ", "")
+                or r.get("Anteproyecto", "")
+                or _get_valor(r, ["Anteproyecto", "anteproyecto"])
+            )
+            trabajo_final_val = _valor_limpio(
+                r.get("Trabajo final ", "")
+                or r.get("Trabajo final", "")
+                or r.get("Trabajo Final", "")
+                or _get_valor(r, ["Trabajo final", "trabajo_final", "trabajo final"])
+            )
 
             if propuesta_val:
                 total_propuestas += 1
-                if any(term in propuesta_val.lower() for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                if any(term in propuesta_val for term in ["aprobado", "aprobada", "approved", "si", "si ", "yes"]):
                     propuestas_aprobadas += 1
 
             if anteproyecto_val:
@@ -779,35 +826,35 @@ def obtener_estadisticas_detalladas():
 
             if trabajo_final_val:
                 total_trabajos_finales += 1
-                if any(term in trabajo_final_val.lower() for term in ["aprobado", "aprobada", "approved", "si", "sí", "yes"]):
+                if any(term in trabajo_final_val for term in ["aprobado", "aprobada", "approved", "si", "si ", "yes"]):
                     trabajos_finales_aprobados += 1
 
         programas = {}
         for r in registros:
-            programa = (r.get("Programa") or "No especificado").strip() or "No especificado"
+            programa = (_get_valor(r, ["Programa", "programa"]) or "No especificado").strip() or "No especificado"
             programas[programa] = programas.get(programa, 0) + 1
 
         asesores = {}
         for r in registros:
-            asesor = (r.get("Asesor") or "").strip()
+            asesor = _get_valor(r, ["Asesor", "asesor"]).strip()
             if asesor and asesor.lower() not in ["no especificado", "sin especificar", "none", ""]:
                 asesores[asesor] = asesores.get(asesor, 0) + 1
         top_asesores = dict(sorted(asesores.items(), key=lambda x: x[1], reverse=True)[:10])
 
-        propuestas_stats = _contar_estado("Propuesta")
-        anteproyecto_stats = _contar_estado("Anteproyecto")
-        trabajo_final_stats = _contar_estado("Trabajo final")
+        propuestas_stats = _contar_estado(["Propuesta", "propuesta", "Propuesta ", "propuesta_final"])
+        anteproyecto_stats = _contar_estado(["Anteproyecto", "anteproyecto", "Anteproyecto ", "anteproyecto_final"])
+        trabajo_final_stats = _contar_estado(["Trabajo final", "Trabajo Final", "Trabajo final ", "trabajo_final", "trabajo final"])
 
         fechas_sustentacion = {}
         for r in registros:
-            fecha = r.get("Fecha sustentaci�n", "").strip()
+            fecha = _get_valor(r, ["Fecha sustentación", "Fecha sustentaci\u00f3n", "fecha_sustentacion"]).strip()
             if fecha and fecha.lower() not in ["no especificado", "none", ""]:
                 fechas_sustentacion[fecha] = fechas_sustentacion.get(fecha, 0) + 1
         fechas_ordenadas = dict(sorted(fechas_sustentacion.items(), key=lambda x: x[0])[-15:])
 
         anos = {}
         for r in registros:
-            ano = str(r.get("A�o", "")).strip()
+            ano = str(_get_valor(r, ["A\u00f1o", "Ano", "a\u00f1o", "ano"])).strip()
             if ano and ano.isdigit():
                 anos[ano] = anos.get(ano, 0) + 1
 
@@ -840,7 +887,7 @@ def obtener_estadisticas_detalladas():
 
     except Exception as e:
         logger.exception("Error calculando estadisticas detalladas")
-        return jsonify({"error": f"Error al obtener estad�sticas: {e}"}), 500
+        return jsonify({"error": f"Error al obtener estad\u00edsticas: {e}"}), 500
 
 # ----------------------------------------------------------------------------
 # control 
