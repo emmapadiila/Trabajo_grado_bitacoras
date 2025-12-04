@@ -6,6 +6,7 @@ import tempfile
 import logging
 import unicodedata
 import threading
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
 
@@ -169,14 +170,28 @@ def get_gspread_client():
     global _gs_client
     with _gs_client_lock:
         if _gs_client is None:
-            cred_path = app.config["GOOGLE_CREDENTIALS_FILE"]
-            if not os.path.exists(cred_path):
-                raise FileNotFoundError(
-                    f"No se encontró credencial en {cred_path}. Configura GOOGLE_APPLICATION_CREDENTIALS."
-                )
-            creds = Credentials.from_service_account_file(cred_path, scopes=_SCOPES)
+            # 1) Primero intentamos leer credenciales desde variable de entorno (Render)
+            creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+            if creds_json:
+                try:
+                    info = json.loads(creds_json)
+                    creds = Credentials.from_service_account_info(info, scopes=_SCOPES)
+                    logger.info("gspread autorizado con GOOGLE_CREDENTIALS_JSON")
+                except Exception as e:
+                    logger.exception("Error leyendo GOOGLE_CREDENTIALS_JSON: %s", e)
+                    raise
+            else:
+                # 2) Fallback: archivo local (desarrollo en tu PC)
+                cred_path = app.config["GOOGLE_CREDENTIALS_FILE"]
+                if not os.path.exists(cred_path):
+                    raise FileNotFoundError(
+                        f"No se encontró credencial en {cred_path}. "
+                        "Configura GOOGLE_APPLICATION_CREDENTIALS o GOOGLE_CREDENTIALS_JSON."
+                    )
+                creds = Credentials.from_service_account_file(cred_path, scopes=_SCOPES)
+                logger.info("gspread autorizado con archivo de credenciales local")
+
             _gs_client = gspread.authorize(creds)
-            logger.info("gspread autorizado")
         return _gs_client
 
 def get_worksheet():
@@ -250,7 +265,6 @@ def get_registros(force: bool = False) -> List[Dict[str, Any]]:
 
 @app.route("/")
 def index():
-
     return render_template("index.html")  
 
 @app.route("/verificar-conexion", methods=["GET"])
@@ -659,6 +673,7 @@ def exportar_pdf():
     except Exception as e:
         logger.exception("Error exportando PDF")
         return jsonify({"error": f"Error al exportar PDF: {e}"}), 500
+
 # ----------------------------------------------------------------------------
 # Excel
 # ----------------------------------------------------------------------------
@@ -706,9 +721,10 @@ def exportar_excel():
         )
     except Exception as e:
         logger.exception("Error exportando Excel")
-        return jsonify({"error": f"Error al exportar Excel: {e}"}), 500
+        return jsonify({"error": f"Error exportando Excel: {e}"}), 500
+
 # ----------------------------------------------------------------------------
-# Estadísticas Mejoradas - CORREGIDAS CON NOMBRES EXACTOS
+# Estadísticas Mejoradas
 # ----------------------------------------------------------------------------
 
 @app.route("/estadisticas-detalladas", methods=["GET"])
@@ -717,7 +733,7 @@ def obtener_estadisticas_detalladas():
         registros = get_registros(force=False)
         total = len(registros)
 
-        # CONTADORES CORREGIDOS - Usando los nombres exactos de las columnas
+        # CONTADORES
         propuestas_aprobadas = 0
         anteproyectos_totales = 0
         trabajos_finales_aprobados = 0
@@ -725,13 +741,6 @@ def obtener_estadisticas_detalladas():
         logger.info("=== ESTADÍSTICAS CON NOMBRES CORRECTOS ===")
         
         for r in registros:
-            # DEBUG: Verificar nombres reales de columnas en el primer registro
-            if anteproyectos_totales == 0 and trabajos_finales_aprobados == 0:
-                logger.info("Nombres de columnas disponibles:")
-                for key in r.keys():
-                    if any(term in key.lower() for term in ['ante', 'trabajo', 'propuesta']):
-                        logger.info(f"  '{key}'")
-            
             # USAR LOS NOMBRES EXACTOS CON ESPACIOS AL FINAL
             propuesta_val = r.get('Propuesta', '') or r.get('Propuesta ', '')
             anteproyecto_val = r.get('Anteproyecto ', '')  # CON ESPACIO AL FINAL
@@ -748,25 +757,6 @@ def obtener_estadisticas_detalladas():
             # Contar Trabajos Finales Aprobados - CUALQUIER valor no vacío cuenta como aprobado
             if trabajo_final_val and str(trabajo_final_val).strip() and trabajo_final_val.strip().lower() != 'trabajo final':
                 trabajos_finales_aprobados += 1
-
-        # Si aún no encontramos valores, buscar en cualquier columna que contenga estos términos
-        if anteproyectos_totales == 0 or trabajos_finales_aprobados == 0:
-            logger.info("=== BÚSQUEDA EXTENDIDA ===")
-            for r in registros:
-                # Buscar en todas las columnas que puedan contener estos datos
-                for col_name, valor in r.items():
-                    if not valor or not str(valor).strip():
-                        continue
-                        
-                    valor_clean = str(valor).strip().lower()
-                    
-                    # Buscar anteproyectos en cualquier columna
-                    if 'ante' in col_name.lower() and 'anteproyecto' in valor_clean:
-                        anteproyectos_totales += 1
-                    
-                    # Buscar trabajos finales en cualquier columna  
-                    if 'trabajo' in col_name.lower() and 'final' in valor_clean:
-                        trabajos_finales_aprobados += 1
 
         logger.info("=== RESULTADOS FINALES ===")
         logger.info(f"Propuestas aprobadas: {propuestas_aprobadas}")
@@ -788,10 +778,9 @@ def obtener_estadisticas_detalladas():
             if asesor and asesor.lower() not in ["no especificado", "sin especificar", "none", ""]:
                 asesores[asesor] = asesores.get(asesor, 0) + 1
         
-        # Ordenar y tomar top 10
         top_asesores = dict(sorted(asesores.items(), key=lambda x: x[1], reverse=True)[:10])
 
-        # Función auxiliar para contar estados (para gráficos)
+        # Función auxiliar para contar estados
         def _contar_estado(campo):
             aprobados = 0
             revision = 0
@@ -799,7 +788,6 @@ def obtener_estadisticas_detalladas():
             no_especificado = 0
             
             for r in registros:
-                # Buscar en campo principal y alternativo
                 estado = str(r.get(campo, '') or r.get(campo + ' ', '')).strip()
                 if not estado:
                     no_especificado += 1
@@ -810,7 +798,6 @@ def obtener_estadisticas_detalladas():
                 elif any(rechazado in estado.lower() for rechazado in ['no aprobado', 'rechazado', 'rejected', 'no']):
                     no_aprobados += 1
                 else:
-                    # Si tiene valor pero no coincide con los patrones, contar como aprobado
                     aprobados += 1
             
             return {
@@ -820,7 +807,6 @@ def obtener_estadisticas_detalladas():
                 'no_especificado': no_especificado
             }
 
-        # Estadísticas de estados para gráficos
         propuestas_stats = _contar_estado('Propuesta')
         anteproyecto_stats = _contar_estado('Anteproyecto')
         trabajo_final_stats = _contar_estado('Trabajo final')
@@ -832,7 +818,6 @@ def obtener_estadisticas_detalladas():
             if fecha and fecha.lower() not in ["no especificado", "none", ""]:
                 fechas_sustentacion[fecha] = fechas_sustentacion.get(fecha, 0) + 1
 
-        # Ordenar fechas y tomar las últimas 15
         fechas_ordenadas = dict(sorted(fechas_sustentacion.items(), key=lambda x: x[0])[-15:])
 
         # Estadísticas por año
@@ -872,6 +857,7 @@ def obtener_estadisticas_detalladas():
     except Exception as e:
         logger.exception("Error calculando estadisticas detalladas")
         return jsonify({"error": f"Error al obtener estadísticas: {e}"}), 500
+
 # ----------------------------------------------------------------------------
 # control 
 # ----------------------------------------------------------------------------
