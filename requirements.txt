@@ -1,7 +1,8 @@
-flask
+Flask
 gspread
 google-auth
 pandas
 reportlab
 openpyxl
 pyinstaller
+gunicorn
